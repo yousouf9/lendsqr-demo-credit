@@ -1,0 +1,30 @@
+{
+  "name": "demo-credit",
+  "version": "1.0.0",
+  "description": "this is a demo credit project for lendsqr",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yousouf9/lendsqr-demo-credit.git"
+  },
+  "keywords": [
+    "loan",
+    "finance",
+    "banks"
+  ],
+  "author": "Yusuf Ibrahim",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yousouf9/lendsqr-demo-credit/issues"
+  },
+  "homepage": "https://github.com/yousouf9/lendsqr-demo-credit#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7"
+  }
+}
