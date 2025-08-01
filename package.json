@@ -3,9 +3,20 @@
   "version": "1.0.0",
   "description": "this is a demo credit project for lendsqr",
   "main": "index.ts",
+  "engines": {
+    "node": "v22.15.1",
+    "npm": "10.9.2"
+  },
   "scripts": {
-    "test": "echo \"No tests yet\"",
-    "prepare": "husky"
+    "start": "ts-node-dev src/index.ts",
+    "build": "tsc",
+    "start:prod": "node ./build/src/index.js",
+    "test": "jest --watchAll --no-cache",
+    "test:ci": "jest",
+    "prepare": "husky",
+    "migrate": "knex migrate:latest --knexfile src/config/knexfile.ts",
+    "migrate:make": "knex migrate:make --knexfile src/config/knexfile.ts",
+    "rollback": "knex migrate:rollback --knexfile src/config/knexfile.ts"
   },
   "repository": {
     "type": "git",
@@ -22,13 +33,42 @@
     "url": "https://github.com/yousouf9/lendsqr-demo-credit/issues"
   },
   "homepage": "https://github.com/yousouf9/lendsqr-demo-credit#readme",
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "./src/test/setup.ts"
+    ]
+  },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "husky": "^9.1.7"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.1.0",
+    "husky": "^9.1.7",
+    "jest": "^30.0.5",
+    "ts-jest": "^29.4.0",
+    "ts-node-dev": "^2.0.0"
   },
   "dependencies": {
+    "axios": "^1.11.0",
+    "bull": "^4.16.5",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.6.1",
+    "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
-    "mysql": "^2.18.1"
+    "mysql2": "^3.14.3",
+    "reflect-metadata": "^0.2.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "tsyringe": "^4.10.0"
   }
 }
