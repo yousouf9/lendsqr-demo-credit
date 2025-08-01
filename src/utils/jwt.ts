@@ -2,7 +2,6 @@ import { promisify } from "util";
 import jwt, { Secret, SignOptions } from "jsonwebtoken";
 import { appVeriable } from "../config/veriables";
 import { IJWT } from "../interfaces/jwt.interface";
-import { injectable } from "tsyringe";
 
 const signAsync = promisify<
   string | Buffer | Object,

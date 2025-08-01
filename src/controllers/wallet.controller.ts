@@ -1,109 +1,65 @@
-// import { Request, Response } from "express";
-// import { Service, Inject } from "typedi";
-// import { WalletService } from "../services/wallet.service";
-// import { IdempotencyRepository } from "../repositories/idempotency.repository";
-// import { TransactionCursor } from "../interfaces/transaction.interface";
+import { Request, Response } from "express";
+import { injectable, inject } from "tsyringe";
+import { WalletService } from "../services/wallet.service";
+import { WALLET_SERVICE } from "../utils/constants";
+import { successResponse } from "../utils/response";
 
-// @Service()
-// export class WalletController {
-//   constructor(
-//     @Inject() private walletService: WalletService,
-//     @Inject() private idempotencyRepo: IdempotencyRepository
-//   ) {}
+@injectable()
+export class WalletController {
+  constructor(@inject(WALLET_SERVICE) private walletService: WalletService) {}
 
-//   private encodeCursor(cursor: TransactionCursor): string {
-//     return Buffer.from(JSON.stringify(cursor)).toString("base64");
-//   }
+  public getBalance = async (req: Request, res: Response) => {
+    const currentUser = req.currentUser!;
+    const result = this.walletService.getWallet(currentUser.walletId);
+    res.json(successResponse(result, "Wallet balance fetched"));
+  };
 
-//   private decodeCursor(encoded: string): TransactionCursor | null {
-//     try {
-//       const decoded = Buffer.from(encoded, "base64").toString("utf8");
-//       const cursor = JSON.parse(decoded) as TransactionCursor;
-//       return { createdAt: cursor.createdAt, id: cursor.id };
-//     } catch {
-//       return null;
-//     }
-//   }
+  public fund = async (req: Request, res: Response) => {
+    const currentUser = req.currentUser!;
+    const idempotencyKey = req.idempotencyKey!;
+    const requestId = req.requestId!;
+    const { amount } = req.body;
+    const result = this.walletService.fundWallet(
+      currentUser.walletId,
+      amount,
+      idempotencyKey,
+      requestId
+    );
+    res.status(201).json(successResponse(result, "Wallet funded successfully"));
+  };
 
-//   async fund(req: Request, res: Response) {
-//     try {
-//       const { userId, amount, idempotencyKey } = req.body;
-//       const transaction = await this.walletService.fundWallet(
-//         userId,
-//         amount,
-//         idempotencyKey
-//       );
-//       await this.idempotencyRepo.saveResponse(idempotencyKey, transaction);
-//       res.status(201).json(transaction);
-//     } catch (error) {
-//       res.status(400).json({ error: error.message });
-//     }
-//   }
+  public transfer = async (req: Request, res: Response) => {
+    const currentUser = req.currentUser!;
+    const idempotencyKey = req.idempotencyKey!;
+    const requestId = req.requestId!;
 
-//   async transfer(req: Request, res: Response) {
-//     try {
-//       const { senderUserId, receiverAccountNo, amount, idempotencyKey } =
-//         req.body;
-//       const { jobId } = await this.walletService.queueTransfer(
-//         senderUserId,
-//         receiverAccountNo,
-//         amount,
-//         idempotencyKey
-//       );
-//       res
-//         .status(202)
-//         .json({ jobId, message: "Transfer queued for processing" });
-//     } catch (error) {
-//       res.status(400).json({ error: error.message });
-//     }
-//   }
+    const { receiverWalletId, amount } = req.body;
 
-//   async withdraw(req: Request, res: Response) {
-//     try {
-//       const { userId, amount, idempotencyKey } = req.body;
-//       const transaction = await this.walletService.withdraw(
-//         userId,
-//         amount,
-//         idempotencyKey
-//       );
-//       await this.idempotencyRepo.saveResponse(idempotencyKey, transaction);
-//       res.status(201).json(transaction);
-//     } catch (error) {
-//       res.status(400).json({ error: error.message });
-//     }
-//   }
+    const { jobId } = await this.walletService.queueTransfer(
+      currentUser.walletId,
+      receiverWalletId,
+      amount,
+      idempotencyKey,
+      requestId
+    );
+    res
+      .status(202)
+      .json(successResponse({ jobId }, "Transfer queued for processing"));
+  };
 
-//   async getUserTransactions(req: Request, res: Response) {
-//     try {
-//       const { userId } = req.params;
-//       const { cursor, limit = "10" } = req.query;
-//       const parsedLimit = parseInt(limit as string);
-
-//       let decodedCursor: TransactionCursor | undefined;
-//       if (cursor) {
-//         const decoded = this.decodeCursor(cursor as string);
-//         if (!decoded) return res.status(400).json({ error: "Invalid cursor" });
-//         decodedCursor = decoded;
-//       }
-
-//       const transactions = await this.walletService.getUserTransactions(
-//         userId,
-//         decodedCursor,
-//         parsedLimit
-//       );
-
-//       let nextCursor: string | null = null;
-//       if (transactions.length === parsedLimit && transactions.length > 0) {
-//         const lastTx = transactions[transactions.length - 1];
-//         nextCursor = this.encodeCursor({
-//           createdAt: lastTx.createdAt.toISOString(),
-//           id: lastTx.id,
-//         });
-//       }
-
-//       res.status(200).json({ transactions, nextCursor });
-//     } catch (error) {
-//       res.status(400).json({ error: error.message });
-//     }
-//   }
-// }
+  public withdraw = async (req: Request, res: Response) => {
+    const currentUser = req.currentUser!;
+    const idempotencyKey = req.idempotencyKey!;
+    const requestId = req.requestId!;
+    const { amount } = req.body;
+    const transaction = await this.walletService.withdraw(
+      currentUser.walletId,
+      amount,
+      idempotencyKey,
+      requestId
+    );
+    res
+      .status(201)
+      .json(successResponse(transaction, "Successfully withdraw from wallet"));
+  };
+}

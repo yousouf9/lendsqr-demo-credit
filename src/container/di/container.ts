@@ -13,6 +13,11 @@ import {
   WALLET_REPOSITORY,
   TRANSACTION_REPOSITORY,
   TRANSACTION_SERVICE,
+  QUEUE_TRANSFER,
+  REDIS_CLIENT,
+  WALLET_AUDIT_SERVICE,
+  IDEMPOTENCY_REPOSITORY,
+  WALLET_AUDIT_REPOSITORY,
 } from "../../utils/constants";
 import { ValidationVendor } from "../../services/validation/vendor.abstract";
 import { ValidationService } from "../../services/validation.service";
@@ -25,6 +30,11 @@ import { AuthService } from "../../services/auth/auth.service";
 import { WalletRepository } from "../../repositories/wallet-repository";
 import { TransactionRepository } from "../../repositories/transaction-repository";
 import { TransactionService } from "../../services/transaction.service";
+import { redis, redisConfig } from "../../config/redis";
+import Queue from "bull";
+import { TranAuditService } from "../../services/transaction-audit.service";
+import { IdempotencyRepository } from "../../repositories/idempotency.repository";
+import { WalletAuditRepository } from "../../repositories/wallet-audit.repository";
 
 //DB
 container.registerInstance<Knex>(KNEX_DB_INSTANCE, db);
@@ -44,12 +54,26 @@ container.registerSingleton<TransactionRepository>(
   TransactionRepository
 );
 
+container.registerSingleton<IdempotencyRepository>(
+  IDEMPOTENCY_REPOSITORY,
+  IdempotencyRepository
+);
+
+container.registerSingleton<WalletAuditRepository>(
+  WALLET_AUDIT_REPOSITORY,
+  WalletAuditRepository
+);
+
 // SERVICES
 container.registerSingleton<UserService>(USER_SERVICE, UserService);
 container.registerSingleton<AuthService>(AUTH_SERVICE, AuthService);
 container.registerSingleton<TransactionService>(
   TRANSACTION_SERVICE,
   TransactionService
+);
+container.registerSingleton<TranAuditService>(
+  WALLET_AUDIT_SERVICE,
+  TranAuditService
 );
 
 //Validtion
@@ -78,3 +102,19 @@ container.registerSingleton<ValidationService>(
   VALIDATION_SERVICE,
   ValidationService
 );
+
+//QUEUES
+container.register(QUEUE_TRANSFER, {
+  useFactory: () =>
+    new Queue(QUEUE_TRANSFER, {
+      redis: redisConfig,
+      limiter: {
+        max: 1,
+        duration: 1000,
+      },
+    }),
+});
+
+container.register(REDIS_CLIENT, {
+  useFactory: () => redis,
+});

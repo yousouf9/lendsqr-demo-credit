@@ -1,5 +1,5 @@
 export interface WalletAudit {
-  id: number;
+  id?: number;
   walletId: number;
   oldBalance: number;
   newBalance: number;

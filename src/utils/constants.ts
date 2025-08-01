@@ -9,6 +9,7 @@ export const TRANSACTION_REPOSITORY = "TransactionRepository";
 export const USER_REPOSITORY = "UserRepository";
 export const IDEMPOTENCY_REPOSITORY = "IdempotencyRepository";
 export const AUTH_REPOSITORY = "AuthRepository";
+export const WALLET_AUDIT_REPOSITORY = "WalletAuditRepository";
 
 //Services
 export const WALLET_SERVICE = "WalletService";
@@ -18,6 +19,7 @@ export const IDEMPOTENCY_SERVICE = "IdempotencyService";
 export const KARMA_SERVICE = "KarmaService";
 export const VALIDATION_SERVICE = "ValidationService";
 export const AUTH_SERVICE = "AuthService";
+export const WALLET_AUDIT_SERVICE = "WalletAuditService";
 
 //Managers
 export const TRANSACTION_MANAGER = "TransactionManager";

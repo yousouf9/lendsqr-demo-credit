@@ -1,10 +1,10 @@
 export interface Transaction {
-  id: number;
+  id?: number;
   senderWalletId?: number;
   receiverWalletId?: number;
   amount: number;
-  type: 0 | 1 | 2; // 0 = fund, 1 = transfer, 2 = withdrawal
-  status: 0 | 1 | 2; // 0 = success, 1 = pending, 2 = failure
+  type: TransactionTypes;
+  status: TransactionStatus;
   reference: string;
   description?: string;
   completedAt?: Date;
@@ -13,6 +13,17 @@ export interface Transaction {
   updatedAt?: Date;
 }
 
+export enum TransactionTypes {
+  fund = 0,
+  transfer = 1,
+  withdraw = 2,
+}
+
+export enum TransactionStatus {
+  success = 0,
+  pending = 1,
+  failure = 2,
+}
 export const TransactionKeys: (keyof Transaction)[] = [
   "id",
   "senderWalletId",

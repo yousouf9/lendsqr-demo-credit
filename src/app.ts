@@ -9,6 +9,7 @@ import { NotFoundError } from "./errors";
 import { errorHandler } from "./middlewares/error-handler";
 import { userAuthRouter } from "./routes/auth";
 import { tranRouter } from "./routes/transaction";
+import { waRouter } from "./routes/wallet";
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(currentUser);
 
 app.use(userAuthRouter);
 app.use(tranRouter);
+app.use(waRouter);
 
 app.use("*", (req, res) => {
   throw new NotFoundError("resource path not found");

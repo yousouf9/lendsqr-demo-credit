@@ -1,91 +1,112 @@
 import { injectable, inject } from "tsyringe";
-import { v4 as uuidv4 } from "uuid";
-import { Wallet } from "../models/wallet.model";
-import { Transaction, TransactionCursor } from "../models/transaction.model";
-import { WalletRepository } from "../repositories/wallet.repository";
-import { TransactionRepository } from "../repositories/transaction.repository";
-import { ITransactionManager } from "../interfaces/repository.interface";
-import Queue from "bull";
-import { Knex } from "knex";
+import {
+  QUEUE_TRANSFER,
+  TRANSACTION_MANAGER,
+  TRANSACTION_SERVICE,
+  WALLET_REPOSITORY,
+  IDEMPOTENCY_REPOSITORY,
+  WALLET_AUDIT_SERVICE,
+} from "../utils/constants";
+import { TransactionService } from "./transaction.service";
+import { WalletRepository } from "../repositories/wallet-repository";
+import { IdempotencyRepository } from "../repositories/idempotency.repository";
+import { ITransactionManager } from "../interfaces/database/transactions.interface";
+import {
+  Transaction,
+  TransactionStatus,
+  TransactionTypes,
+} from "../interfaces/transaction.interface";
+import { ITransferQueue } from "../interfaces/queue/transfer.queue.interface";
+import { BadRequestError, NotFoundError } from "../errors";
+import { DecimalUtils } from "../utils/money";
+import { TranAuditService } from "./transaction-audit.service";
+import { Wallet } from "../interfaces/wallet.interface";
+import { DefaultQueueConfig } from "../config/redis";
+
+// Interface for Queue to make it mockable
 
 @injectable()
 export class WalletService {
-  private transferQueue: Queue.Queue;
-
   constructor(
-    @inject() private walletRepo: WalletRepository,
-    @inject() private transactionRepo: TransactionRepository,
-    @inject("TransactionManager")
+    @inject(WALLET_REPOSITORY) private walletRepo: WalletRepository,
+    @inject(TRANSACTION_SERVICE) private transactionSrv: TransactionService,
+    @inject(WALLET_AUDIT_SERVICE) private tranAuditSrv: TranAuditService,
+    @inject(TRANSACTION_MANAGER)
     private transactionManager: ITransactionManager,
-    @inject("Redis") private redis: any
+    @inject(QUEUE_TRANSFER) private transferQueue: ITransferQueue,
+    @inject(IDEMPOTENCY_REPOSITORY)
+    private idempotencyRepo: IdempotencyRepository
   ) {
-    this.transferQueue = new Queue("transfer-queue", { redis });
     this.setupQueueProcessor();
   }
 
   private setupQueueProcessor() {
     this.transferQueue.process(async (job) => {
-      const { senderUserId, receiverAccountNo, amount, idempotencyKey } =
+      const { senderUserId, receiverAccountNo, amount, idempotencyKey, url } =
         job.data;
       return this.processTransfer(
         senderUserId,
         receiverAccountNo,
         amount,
-        idempotencyKey
+        idempotencyKey,
+        url
       );
     });
   }
 
-  async createWallet(userId: string): Promise<Wallet> {
-    return this.walletRepo.create({ userId, balance: 0, version: 0 });
+  async getWallet(
+    walletId: number,
+    transaction?: ITransactionManager
+  ): Promise<Wallet> {
+    const wallet = await this.walletRepo.findOne({ id: walletId }, transaction);
+    if (!wallet) throw new NotFoundError("Wallet not found");
+    return wallet;
   }
 
   async fundWallet(
-    userId: string,
+    walletId: number,
     amount: number,
-    idempotencyKey: string
+    idempotencyKey: string,
+    url: string
   ): Promise<Transaction> {
     await this.transactionManager.beginTransaction();
     try {
-      const wallet = await this.walletRepo.findOne(
-        { userId },
-        this.transactionManager
-      );
-      if (!wallet) throw new Error("Wallet not found");
-      if (amount <= 0) throw new Error("Amount must be positive");
+      const wallet = await this.getWallet(walletId, this.transactionManager);
 
       const oldBalance = wallet.balance;
-      const newBalance = oldBalance + amount;
+      const newBalance = DecimalUtils.add(oldBalance, amount);
 
       await this.walletRepo.update(
-        wallet.id,
-        { balance: newBalance, version: wallet.version },
+        wallet.id!,
+        { balance: newBalance },
         this.transactionManager
       );
 
-      const transaction = await this.transactionRepo.create(
+      const transaction = await this.transactionSrv.createTransaction(
         {
-          id: uuidv4(),
           receiverWalletId: wallet.id,
           amount,
-          type: "FUND",
-          status: "COMPLETED",
+          type: TransactionTypes.fund,
+          status: TransactionStatus.success,
           reference: idempotencyKey,
           description: `Fund wallet with ${amount} kobo`,
+          completedAt: new Date(),
         },
         this.transactionManager
       );
 
-      await this.transactionRepo.createAuditLog(
+      // create audit
+      await this.tranAuditSrv.createAudit(
         {
-          id: uuidv4(),
-          walletId: wallet.id,
+          walletId: wallet.id!,
           oldBalance,
           newBalance,
-          transactionId: transaction.id,
+          transactionId: transaction.id!,
         },
         this.transactionManager
       );
+
+      await this.idempotencyRepo.saveResponse(idempotencyKey, url, transaction);
 
       await this.transactionManager.commitTransaction();
       return transaction;
@@ -96,103 +117,95 @@ export class WalletService {
   }
 
   async queueTransfer(
-    senderUserId: string,
-    receiverAccountNo: string,
+    senderWalletId: number,
+    receiverWalletId: string,
     amount: number,
-    idempotencyKey: string
+    idempotencyKey: string,
+    url: string
   ): Promise<{ jobId: string }> {
     const job = await this.transferQueue.add(
-      { senderUserId, receiverAccountNo, amount, idempotencyKey },
+      { senderWalletId, receiverWalletId, amount, idempotencyKey, url },
       {
+        ...DefaultQueueConfig,
         jobId: idempotencyKey,
-        attempts: 3,
-        backoff: { type: "exponential", delay: 1000 },
       }
     );
     return { jobId: job.id as string };
   }
 
   async processTransfer(
-    senderUserId: string,
-    receiverAccountNo: string,
+    senderWalletId: number,
+    receiverWalletId: number,
     amount: number,
-    idempotencyKey: string
+    idempotencyKey: string,
+    url: string
   ): Promise<Transaction> {
     await this.transactionManager.beginTransaction();
     try {
-      const senderWallet = await this.walletRepo.findOne(
-        { userId: senderUserId },
-        this.transactionManager
-      );
-      const receiverWallet = await this.walletRepo.findByAccountNo(
-        receiverAccountNo,
-        this.transactionManager
-      );
+      const [senderWallet, receiverWallet] = await Promise.all([
+        this.getWallet(senderWalletId, this.transactionManager),
+        this.getWallet(receiverWalletId, this.transactionManager),
+      ]);
 
-      if (!senderWallet || !receiverWallet) throw new Error("Wallet not found");
-      if (senderWallet.balance < amount) throw new Error("Insufficient funds");
-      if (amount <= 0) throw new Error("Amount must be positive");
+      if (!senderWallet || !receiverWallet)
+        throw new NotFoundError("Wallet not found");
+      if (senderWallet.balance < amount)
+        throw new BadRequestError("Insufficient funds");
 
       const senderOldBalance = senderWallet.balance;
+      const senderNewBalance = DecimalUtils.subtract(senderOldBalance, amount);
+
       const receiverOldBalance = receiverWallet.balance;
+      const recieverNewBalance = DecimalUtils.add(receiverOldBalance, amount);
 
-      const senderRowsAffected = await (
-        this.transactionManager.getQueryRunner() as Knex.Transaction
-      )("wallets")
-        .where({ id: senderWallet.id, version: senderWallet.version })
-        .update({
-          balance: senderOldBalance - amount,
-          version: senderWallet.version + 1,
-        });
-
-      if (senderRowsAffected === 0)
-        throw new Error("Concurrency conflict detected");
-
+      //updating sender wallet
       await this.walletRepo.update(
-        receiverWallet.id,
-        {
-          balance: receiverOldBalance + amount,
-          version: receiverWallet.version,
-        },
+        senderWallet.id!,
+        { balance: senderNewBalance },
         this.transactionManager
       );
 
-      const transaction = await this.transactionRepo.create(
+      //updating receiver wallet
+      await this.walletRepo.update(
+        receiverWallet.id!,
+        { balance: recieverNewBalance },
+        this.transactionManager
+      );
+
+      const transaction = await this.transactionSrv.createTransaction(
         {
-          id: uuidv4(),
           senderWalletId: senderWallet.id,
           receiverWalletId: receiverWallet.id,
           amount,
-          type: "TRANSFER",
-          status: "COMPLETED",
+          type: TransactionTypes.transfer,
+          status: TransactionStatus.success,
           reference: idempotencyKey,
-          description: `Transfer ${amount} kobo to ${receiverAccountNo}`,
+          description: `Transfer ${amount} kobo to wallet id ${receiverWalletId}`,
         },
         this.transactionManager
       );
 
-      await this.transactionRepo.createAuditLog(
+      await this.tranAuditSrv.createAudit(
         {
-          id: uuidv4(),
-          walletId: senderWallet.id,
+          walletId: senderWallet.id!,
           oldBalance: senderOldBalance,
-          newBalance: senderOldBalance - amount,
-          transactionId: transaction.id,
+          newBalance: senderNewBalance,
+          transactionId: transaction.id!,
         },
         this.transactionManager
       );
 
-      await this.transactionRepo.createAuditLog(
+      await this.tranAuditSrv.createAudit(
         {
-          id: uuidv4(),
-          walletId: receiverWallet.id,
+          walletId: receiverWallet.id!,
           oldBalance: receiverOldBalance,
-          newBalance: receiverOldBalance + amount,
-          transactionId: transaction.id,
+          newBalance: recieverNewBalance,
+          transactionId: transaction.id!,
         },
         this.transactionManager
       );
 
+      await this.idempotencyRepo.saveResponse(idempotencyKey, url, transaction);
       await this.transactionManager.commitTransaction();
       return transaction;
     } catch (error) {
@@ -202,55 +215,50 @@ export class WalletService {
   }
 
   async withdraw(
-    userId: string,
+    walletId: number,
     amount: number,
-    idempotencyKey: string
+    idempotencyKey: string,
+    url: string
   ): Promise<Transaction> {
     await this.transactionManager.beginTransaction();
     try {
-      const wallet = await this.walletRepo.findOne(
-        { userId },
-        this.transactionManager
-      );
-      if (!wallet) throw new Error("Wallet not found");
-      if (wallet.balance < amount) throw new Error("Insufficient funds");
-      if (amount <= 0) throw new Error("Amount must be positive");
+      const wallet = await this.getWallet(walletId, this.transactionManager);
+      if (wallet.balance < amount)
+        throw new BadRequestError("Insufficient funds");
+      if (amount <= 0) throw new BadRequestError("Amount must be positive");
 
       const oldBalance = wallet.balance;
-      const newBalance = oldBalance - amount;
+      const newBalance = DecimalUtils.subtract(oldBalance, amount);
 
-      const rowsAffected = await (
-        this.transactionManager.getQueryRunner() as Knex.Transaction
-      )("wallets")
-        .where({ id: wallet.id, version: wallet.version })
-        .update({ balance: newBalance, version: wallet.version + 1 });
+      await this.walletRepo.update(
+        wallet.id!,
+        { balance: newBalance },
+        this.transactionManager
+      );
 
-      if (rowsAffected === 0) throw new Error("Concurrency conflict detected");
-
-      const transaction = await this.transactionRepo.create(
+      const transaction = await this.transactionSrv.createTransaction(
         {
-          id: uuidv4(),
           senderWalletId: wallet.id,
           amount,
-          type: "WITHDRAW",
-          status: "COMPLETED",
+          type: TransactionTypes.withdraw,
+          status: TransactionStatus.success,
           reference: idempotencyKey,
           description: `Withdraw ${amount} kobo`,
         },
         this.transactionManager
       );
 
-      await this.transactionRepo.createAuditLog(
+      await this.tranAuditSrv.createAudit(
         {
-          id: uuidv4(),
-          walletId: wallet.id,
+          walletId: wallet.id!,
           oldBalance,
           newBalance,
-          transactionId: transaction.id,
+          transactionId: transaction.id!,
         },
         this.transactionManager
       );
 
+      await this.idempotencyRepo.saveResponse(idempotencyKey, url, transaction);
       await this.transactionManager.commitTransaction();
       return transaction;
     } catch (error) {
