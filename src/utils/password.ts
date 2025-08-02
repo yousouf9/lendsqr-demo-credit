@@ -13,12 +13,14 @@ export class Password {
   }
 
   static async compare(
-    storeedPassword: string,
+    storedPassword: string,
     suppliedPassword: string
   ): Promise<boolean> {
-    const [hashPassword, salt] = storeedPassword.split(".");
+    if (!storedPassword?.includes(".")) {
+      throw new TypeError("Invalid stored password format.");
+    }
 
-    console.log(hashPassword, salt);
+    const [hashPassword, salt] = storedPassword.split(".");
 
     const buff = (await scryptAsyn(suppliedPassword, salt, 64)) as Buffer;
 

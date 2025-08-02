@@ -106,6 +106,9 @@ Idempotency: Redis and database ensure duplicate request prevention.
 
 ## API Documentation
 
+You can explore the full API using Postman:
+[Download Postman Collection](./docs/demo-credit.postman_collection.json)
+
 ### Pagination
 
 Cursor-Based: Uses a composite cursor (createdAt and id) to handle timestamp collisions, ensuring accurate and stable pagination for transaction history.

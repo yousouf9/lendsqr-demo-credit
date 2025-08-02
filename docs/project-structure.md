@@ -6,6 +6,7 @@ Here’s an overview of the source directory and what each folder does:
 
 ```bash
 src/
+├── __mocks__/ # shared mock folder
 ├── config/ # General application configs (database, redis, transactions, knex )
 ├── container/ # Dependency injection setup (tsyringe)
 ├── controllers/ # HTTP request handlers

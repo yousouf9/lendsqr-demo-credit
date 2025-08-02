@@ -46,8 +46,6 @@ export class TransactionService {
     cursor: Cursor,
     limit: number = 20
   ): Promise<Transaction[]> {
-    console.log("Fecthed");
-
     return this.transactionRepo.findAll(
       {
         senderWalletId: user.walletId,

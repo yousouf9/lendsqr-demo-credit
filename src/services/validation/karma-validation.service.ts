@@ -1,4 +1,3 @@
-import axios from "axios";
 import { injectable } from "tsyringe";
 import { ValidationVendor } from "./vendor.abstract";
 import { httpClient } from "../../utils/request";

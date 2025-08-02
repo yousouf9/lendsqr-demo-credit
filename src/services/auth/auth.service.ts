@@ -38,7 +38,7 @@ export class AuthService {
   async register(data: RegisterUser): Promise<string> {
     try {
       // Validate user data against karma blacklist / check for existance in db
-      //await this.validateUserData(data.email, data.phoneNumber);
+      await this.validateUserData(data.email, data.phoneNumber);
 
       // start transaction
       await this.transactionManager.beginTransaction();
@@ -83,6 +83,8 @@ export class AuthService {
 
       const isMatch = await this.comparePassword(user.passwordHash, password);
       if (!isMatch) {
+        console.log(isMatch, "value");
+
         throw new BadRequestError("Invalid email or password");
       }
 
@@ -119,10 +121,10 @@ export class AuthService {
   }
 
   private async comparePassword(
-    storeedPassword: string,
+    storedPassword: string,
     suppliedPassword: string
   ): Promise<boolean> {
-    return Password.compare(storeedPassword, suppliedPassword);
+    return Password.compare(storedPassword, suppliedPassword);
   }
 
   private async validateUserData(
