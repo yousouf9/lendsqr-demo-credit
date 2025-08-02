@@ -137,4 +137,4 @@ Implementation: Transactions are ordered by createdAt DESC, id DESC, with cursor
 
 ## Video Review
 
-watch video for more clarity [click here](./docs/db.md)
+watch video for more clarity [click here](https://www.loom.com/share/3908899208cd44bfb6534a1938f59aec)
