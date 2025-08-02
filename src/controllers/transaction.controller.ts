@@ -21,7 +21,6 @@ export class TransactionController {
   public getTransactions = async (req: Request, res: Response) => {
     try {
       const currentUser = req.currentUser!;
-      console.log(this.trnSrv);
 
       const { cursor, limit = "20" } = req.query;
       const parsedLimit = parseInt(limit as string);
@@ -32,6 +31,9 @@ export class TransactionController {
         if (!decoded) {
           throw new BadRequestError("Invalid Cursor provided");
         }
+
+        console.log(decoded, limit);
+
         decodedCursor = decoded;
       }
 

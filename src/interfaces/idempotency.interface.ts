@@ -1,11 +1,11 @@
 export interface IdempotencyKey {
-  id: number;
+  id?: number;
   key: string;
   userId: number;
   requestId: string;
-  response?: any;
-  createdAt: Date;
-  updatedAt: Date;
+  response?: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const IdempotencyKeyKeys: (keyof IdempotencyKey)[] = [

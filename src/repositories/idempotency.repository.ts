@@ -15,33 +15,35 @@ export class IdempotencyRepository {
   async checkAndLock(
     key: string,
     requestId: string,
+    userId: number,
     ttl: number = 86400
   ): Promise<{ exists: boolean; response?: any }> {
-    const redisKey = `idempotency:${key}:${requestId}`;
-    const lockKey = `lock:idempotency:${key}:${requestId}`;
+    const redisKey = `idempotency:${key}:${requestId}:${userId}`;
+    const lockKey = `lock:idempotency:${key}:${requestId}:${userId}`;
 
     const lock = await this.redis.set(lockKey, "locked", "PX", 30000, "NX");
     if (!lock) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      return this.checkAndLock(key, requestId, ttl);
+      return this.checkAndLock(key, requestId, userId, ttl);
     }
 
     try {
       const existing = await this.redis.get(redisKey);
       if (existing) {
         const record = await this.knex(TABLES.idempotencyKeys)
-          .where({ key, requestId })
+          .where({ key, requestId, userId })
           .first();
+
         return {
           exists: true,
-          response: record?.response ? JSON.parse(record.response) : null,
+          response: record?.response ? record.response : null,
         };
       }
 
       await this.knex(TABLES.idempotencyKeys).insert({
         key,
         requestId,
-        createdAt: new Date(),
+        userId,
       });
 
       await this.redis.set(

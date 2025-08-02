@@ -23,7 +23,7 @@ router.get(
   requireAuth,
   [
     query("limit").optional().isInt().withMessage({
-      message: "Id must be an integer",
+      message: "limit must be an integer",
     }),
     query("cursor").optional().isString().withMessage({
       message: "cursor must be a string",

@@ -6,25 +6,25 @@ export async function up(knex: Knex): Promise<void> {
     table
       .integer("senderWalletId")
       .unsigned()
-      .notNullable()
+      .nullable()
       .references("id")
       .inTable("wallets")
       .onDelete("CASCADE");
     table
       .integer("receiverWalletId")
       .unsigned()
-      .notNullable()
+      .nullable()
       .references("id")
       .inTable("wallets")
       .onDelete("CASCADE");
     table.bigInteger("amount").notNullable();
-    table.string("reference").notNullable();
+    table.string("reference").unique().notNullable();
     table.text("description").nullable();
     table.text("reason").nullable(); // For failed transactions
     table.tinyint("status").defaultTo(1).notNullable(); // 0 = success, 1 = pending, 2 = failure
     table.tinyint("type").notNullable(); // 0 = fund, 1 = transfer, 2 = withdrawal
     table.timestamp("createdAt").defaultTo(knex.fn.now());
-    table.timestamp("completed").nullable();
+    table.timestamp("completedAt").nullable();
     table
       .timestamp("updatedAt")
       .defaultTo(knex.fn.now())

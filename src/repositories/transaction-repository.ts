@@ -6,6 +6,7 @@ import { inject, injectable } from "tsyringe";
 import { TABLES } from "../utils/tables";
 import { Cursor } from "../interfaces/cursor.interface";
 import { KNEX_DB_INSTANCE } from "../utils/constants";
+import { formatDateTime } from "../utils/date";
 
 @injectable()
 export class TransactionRepository implements IRepository<Transaction> {
@@ -77,14 +78,16 @@ export class TransactionRepository implements IRepository<Transaction> {
       });
     }
 
+    query.orderBy("createdAt", "desc").orderBy("id", "desc");
+
     // Apply cursor-based pagination
     if (options?.cursor) {
       query.where(function () {
-        this.where("createdAt", ">", options.cursor.createdAt).orWhere(
+        this.where("createdAt", "<", options.cursor.createdAt).orWhere(
           function () {
             this.where("createdAt", "=", options.cursor.createdAt).andWhere(
               "id",
-              ">",
+              "<",
               options.cursor.id
             );
           }
@@ -93,10 +96,8 @@ export class TransactionRepository implements IRepository<Transaction> {
     }
 
     if (options?.limit) query.limit(options.limit);
-    return query.orderBy([
-      { column: "createdAt", order: "desc" },
-      { column: "id", order: "desc" },
-    ]);
+
+    return query;
   }
 
   async update(

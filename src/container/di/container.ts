@@ -18,6 +18,7 @@ import {
   WALLET_AUDIT_SERVICE,
   IDEMPOTENCY_REPOSITORY,
   WALLET_AUDIT_REPOSITORY,
+  WALLET_SERVICE,
 } from "../../utils/constants";
 import { ValidationVendor } from "../../services/validation/vendor.abstract";
 import { ValidationService } from "../../services/validation.service";
@@ -35,6 +36,7 @@ import Queue from "bull";
 import { TranAuditService } from "../../services/transaction-audit.service";
 import { IdempotencyRepository } from "../../repositories/idempotency.repository";
 import { WalletAuditRepository } from "../../repositories/wallet-audit.repository";
+import { WalletService } from "../../services/wallet.service";
 
 //DB
 container.registerInstance<Knex>(KNEX_DB_INSTANCE, db);
@@ -75,6 +77,8 @@ container.registerSingleton<TranAuditService>(
   WALLET_AUDIT_SERVICE,
   TranAuditService
 );
+
+container.registerSingleton<WalletService>(WALLET_SERVICE, WalletService);
 
 //Validtion
 container.register<ValidationVendor>(VALIDATION_VENDOR, {

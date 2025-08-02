@@ -27,6 +27,20 @@ export const errorHandler = (
     });
   }
 
+  //@ts-ignore
+  if (err.code === "ER_DUP_ENTRY") {
+    return res.status(400).json({
+      status: Status.Failed,
+      errors: [
+        {
+          message: "Duplicate entry, request already processed",
+          error_code: `Duplicate`,
+          field: null,
+        },
+      ],
+    });
+  }
+
   res.status(500).json({
     status: Status.Failed,
     errors: [

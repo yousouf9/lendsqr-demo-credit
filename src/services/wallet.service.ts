@@ -42,11 +42,11 @@ export class WalletService {
 
   private setupQueueProcessor() {
     this.transferQueue.process(async (job) => {
-      const { senderUserId, receiverAccountNo, amount, idempotencyKey, url } =
+      const { senderWalletId, receiverWalletId, amount, idempotencyKey, url } =
         job.data;
       return this.processTransfer(
-        senderUserId,
-        receiverAccountNo,
+        senderWalletId,
+        receiverWalletId,
         amount,
         idempotencyKey,
         url
@@ -60,6 +60,7 @@ export class WalletService {
   ): Promise<Wallet> {
     const wallet = await this.walletRepo.findOne({ id: walletId }, transaction);
     if (!wallet) throw new NotFoundError("Wallet not found");
+
     return wallet;
   }
 
@@ -111,6 +112,8 @@ export class WalletService {
       await this.transactionManager.commitTransaction();
       return transaction;
     } catch (error) {
+      console.log("error", error);
+
       await this.transactionManager.rollbackTransaction();
       throw error;
     }
@@ -247,7 +250,6 @@ export class WalletService {
         },
         this.transactionManager
       );
-
       await this.tranAuditSrv.createAudit(
         {
           walletId: wallet.id!,

@@ -10,7 +10,7 @@ export class WalletController {
 
   public getBalance = async (req: Request, res: Response) => {
     const currentUser = req.currentUser!;
-    const result = this.walletService.getWallet(currentUser.walletId);
+    const result = await this.walletService.getWallet(currentUser.walletId);
     res.json(successResponse(result, "Wallet balance fetched"));
   };
 
@@ -19,7 +19,7 @@ export class WalletController {
     const idempotencyKey = req.idempotencyKey!;
     const requestId = req.requestId!;
     const { amount } = req.body;
-    const result = this.walletService.fundWallet(
+    const result = await this.walletService.fundWallet(
       currentUser.walletId,
       amount,
       idempotencyKey,

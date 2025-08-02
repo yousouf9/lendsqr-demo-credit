@@ -38,7 +38,7 @@ export class AuthService {
   async register(data: RegisterUser): Promise<string> {
     try {
       // Validate user data against karma blacklist / check for existance in db
-      await this.validateUserData(data.email, data.phoneNumber);
+      //await this.validateUserData(data.email, data.phoneNumber);
 
       // start transaction
       await this.transactionManager.beginTransaction();

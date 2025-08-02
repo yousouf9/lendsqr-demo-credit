@@ -22,30 +22,37 @@ export class IdempotencyMiddleware {
     private idempotencyRepo: IdempotencyRepository
   ) {}
 
-  async check(req: Request, res: Response, next: NextFunction) {
-    const idempotencyKey = req.headers["idempotency-key"] as string;
-    if (!idempotencyKey)
-      throw new BadRequestError("Idempotency key is required");
+  public check = async (req: Request, res: Response, next: NextFunction) => {
+    const currentUser = req.currentUser!;
+    try {
+      const idempotencyKey = req.headers["idempotency-key"] as string;
+      if (!idempotencyKey)
+        throw new BadRequestError("Idempotency key is required");
 
-    const requestId = `${req.method}:${req.url}`;
-    const { exists, response } = await this.idempotencyRepo.checkAndLock(
-      idempotencyKey,
-      requestId
-    );
+      const requestId = `${req.method}:${req.url}`;
+      const { exists, response } = await this.idempotencyRepo.checkAndLock(
+        idempotencyKey,
+        requestId,
+        currentUser.userId!
+      );
 
-    if (exists && response) {
-      if (response.status === TransactionStatus.pending) {
+      if (exists && response) {
+        if (response.status === TransactionStatus.pending) {
+          return res
+            .status(202)
+            .json(successResponse(null, "Request is being processed"));
+        }
         return res
-          .status(202)
-          .json(successResponse(null, "Request is being processed"));
+          .status(200)
+          .json(successResponse(response, "Request already processed"));
       }
-      return res
-        .status(200)
-        .json(successResponse(response, "Request already processed"));
-    }
 
-    req.idempotencyKey = idempotencyKey;
-    req.requestId = requestId;
-    next();
-  }
+      req.idempotencyKey = idempotencyKey;
+      req.requestId = requestId;
+      next();
+    } catch (error) {
+      console.log("error", error);
+      throw error;
+    }
+  };
 }

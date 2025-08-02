@@ -85,10 +85,16 @@ class AppVeriable {
           password: this.getDbPassword(),
           database: this.getDbName(),
           port: this.getDbPort(),
+          timezone: "Z",
         },
         pool: {
           min: 5,
           max: 10,
+          afterCreate: (conn: any, done: any) => {
+            conn.query("SET time_zone = '+00:00';", (err: any) => {
+              done(err, conn);
+            });
+          },
         },
       };
     }
@@ -101,10 +107,16 @@ class AppVeriable {
         password: this.getDbPassword(),
         database: this.getDbName(),
         port: this.getDbPort(),
+        timezone: "Z",
       },
       pool: {
         min: 1,
         max: 5,
+        afterCreate: (conn: any, done: any) => {
+          conn.query("SET time_zone = '+00:00';", (err: any) => {
+            done(err, conn);
+          });
+        },
       },
     };
   }
